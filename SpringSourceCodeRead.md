@@ -87,3 +87,73 @@ Example properties file:
 public class PropertySourcesPlaceholderConfigurer extends PlaceholderConfigurerSupport implements EnvironmentAware {...}
 // 可以替代PropertyPlaceeholderConfigurer
 ```
+#### 1.4 示例代码
+
+```
+    @Test
+    public void testPropertiesLoad(){
+        ApplicationContext context = new ClassPathXmlApplicationContext("classpath:applicationContext_test.xml");
+        PropertiesConfig bean = (PropertiesConfig) context.getBean("propertiesConfig");
+        System.out.println("testValue:" + bean.getTestValue());
+        .....
+    }
+    
+    public class PropertiesConfig {
+        private String testValue;
+        private String testValue2ForOverride;
+        private String valueNoAnnotate;
+        private String valueNoAnnotateForDefault;
+        private String placeHolders;
+    .......
+}
+<bean id="propertyConfigurer1"  class="org.springframework.beans.factory.config.PropertyOverrideConfigurer">
+        <property name="locations">
+                <value>test.properties</value>
+        </property>
+</bean>
+// 注意受OverridingConfigurer托管的配置文件，需要按照beanName.property的写法配置在文件中
+<bean id="propertyConfigurer2"   class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer">
+        <property name="locations">
+            <value>test2.properties</value>
+        </property>
+</bean>
+
+<bean id ="propertiesConfig" class="com.hljiang.spring.bean.PropertiesConfig">
+    <property name="testValue" value="aa"></property>
+    <property name="testValue2ForOverride" value="aa"></property>
+    <property name="valueNoAnnotate" value="${a}"></property>
+    <property name="valueNoAnnotateForDefault" value="${b:100}"></property>
+    <property name="placeHolders" value="${key1}${key2}${key3}"></property>
+</bean> 
+
+```
+#### 1.4 propertyConfigurer 结构
+![](media/spring/propertyConfigurer.png)
+
+- 图中可以看出其实Configurer是一个Bean的预处理器，在创建bean的时候可以调用预处理方法，继续查找引用
+
+> `abstract class PropertyResourceConfigurer extends PropertiesLoaderSupport
+		implements BeanFactoryPostProcessor, PriorityOrdered `
+		
+![](media/spring/postRetrieve1.png)
+> 观察引用方-> postProcessorRegistrationDelegate.java中调用了该处理器；
+> 发现跳到AbstractApplicationContext类中；
+> 而AbstractApplicationContext是所有实现ApplicationContext子类的抽象父类；
+> AbstractApplicationContext.invokeBeanFactoryPostProcessors
+
+- 补充说明：
+`插入idea mac 快捷键： option+command+b -> find implements;
+command+option+左箭头  退回到上一个操作
+shift+command+4 system 截图
+option+F7 查看usage`
+		
+- 处理props，processProperties()
+	
+```	
+// 实现了这个预处理器，在方法里处理properties
+// 1、合并props 2、convertProps 3、processProperties
+@Override
+public void postProcessBeanFactory(...){}
+1、 propertiesLoaderSupport.loadProperties(Properties props){
+}
+```
