@@ -86,7 +86,18 @@ Example properties file:
 ```
 public class PropertySourcesPlaceholderConfigurer extends PlaceholderConfigurerSupport implements EnvironmentAware {...}
 // 可以替代PropertyPlaceeholderConfigurer
+PropertyPlaceholderConfigurer这个类是把所有的属性集中放到Properties中；
+PropertySourcesPlaceholderConfigurer:
+1.该类有一个PropertySources的集合;
+2.集合中放的是PropertySource，它是一个抽象类，
+3.getProperty方法交由子类实现；
+4.每一个PropertySource可以是一个Properties
+5.而且PropertySource可以是任何东西；例如：System.getProperteis 、System.getenv
 ```
+
+PropertySourcesPlaceholderConfigurer类直接重写了postProcessBeanFactory方法，如果PropertySources集合为空，此类会把Environment、Properties文件、localProperties放到集合中；
+
+
 #### 1.4 示例代码
 
 ```
@@ -127,7 +138,7 @@ public class PropertySourcesPlaceholderConfigurer extends PlaceholderConfigurerS
 </bean> 
 
 ```
-#### 1.4 propertyConfigurer 结构
+#### 1.5 propertyConfigurer 结构
 ![](media/spring/propertyConfigurer.png)
 
 - 图中可以看出其实Configurer是一个Bean的预处理器，在创建bean的时候可以调用预处理方法，继续查找引用
@@ -145,7 +156,9 @@ public class PropertySourcesPlaceholderConfigurer extends PlaceholderConfigurerS
 `插入idea mac 快捷键： option+command+b -> find implements;
 command+option+左箭头  退回到上一个操作
 shift+command+4 system 截图
-option+F7 查看usage`
+option+F7 查看usage
+command + o 查找类
+option + Enter`
 		
 - 处理props，processProperties()
 	
@@ -154,6 +167,30 @@ option+F7 查看usage`
 // 1、合并props 2、convertProps 3、processProperties
 @Override
 public void postProcessBeanFactory(...){}
-1、 propertiesLoaderSupport.loadProperties(Properties props){
+    // 需要判断isOverride
+    // 如果localProperties可能需要进行mergeInto
+    propertiesLoaderSupport.loadProperties(Properties props){
 }
 ```
+- debug 下调用路径，和1.5中介绍一致propertiesLoaderSupport.mergeProperties
+![](media/spring/debug.png)
+- propertiesLoaderSupport.loadProperties
+![](media/spring/debug1.png)
+可以看出来先扫描的xml中第一个配置的OverridingConfigurer的托管配置，load之后将properties中配置就解析成Key和Value对的形式，实际上HashTable的内存对象
+
+```
+propertiesLoaderSupport.loadProperties
+    -> PropertiesLoaderUtils.fillProperties
+    -> DefaultPropertiesPersister.load(props, stream)
+    // 从文件流中获取文件并解析载入到Properties的props里返回；
+    // 具体解析placeholders同时操作内存交与StringResolver、BeanVistor
+    // 以上在具体的Configurer类里定义private class
+    ---> Properties.load(Stream in); 是一个synchorized method;
+    load中根据byte遍历，会对\t \\ \f以及= ： 这种特殊字符处理；
+    并以此将key=value对应的index解析出，然后in.read(index)类似这种转成string存储
+    class Properties extends Hashtable<Object,Object>
+```
+- 占位符placeholder处理
+![](media/spring/debug2.png)
+- BeanVistor和StringResolver
+![](media/spring/debug3.png)
