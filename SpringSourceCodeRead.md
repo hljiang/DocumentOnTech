@@ -43,7 +43,7 @@ class="org.springframework.jdbc.datasource.DriverManagerDataSource"/>
 @Value("${person.age}")
 -> org.springframework.beans.factory.annotation.Value
 ```
-> 可以定义多个configurers，可以拥有自己的placeholder syntax，其中涉及到ignoreUnresolvablePlaceholders属性，如果一个Configurer管理的properties中，解析Placeholder失败，默认是会抛出异常，如果是true，会忽略异常，然后继续下一个configurer里查找
+> 可以定义多个configurers，可以拥有自己的placeholder syntax，其中涉及到ignoreUnresolvablePlaceholders属性，如果一个Configurer管理的properties中，解析Placeholder失败，默认是会抛出异常，如果是true，会忽略异常，然后继续下一个configurer里查找,如果都解析不了，内存里就依旧是${}placeholder形式输出
 
 ```
 PlaceholderConfigurerSupport中就定义了基本的占位符格式，perfix-> ${，suffix -> }，分隔符-> :
@@ -189,8 +189,40 @@ propertiesLoaderSupport.loadProperties
     load中根据byte遍历，会对\t \\ \f以及= ： 这种特殊字符处理；
     并以此将key=value对应的index解析出，然后in.read(index)类似这种转成string存储
     class Properties extends Hashtable<Object,Object>
+    有多个locations的时候，for遍历，Prop.load依次添加解析的props
 ```
 - 占位符placeholder处理
 ![](media/spring/debug2.png)
 - BeanVistor和StringResolver
 ![](media/spring/debug3.png)
+> resolvePlaceholder 解析properties得到的PropVal如果为null，然后根据分隔符：解析出默认值使用
+
+`PropertyOverridingConfigurer->postProcessBeanFactory->processProperties->processKey()
+其中，用.做分隔符，识别beanName和property，注入所需bean，bean的field的内存对象是MutablePropertyValues对象-> List<PropertyValue>对象`
+
+##### debug 日志---- 扫描OverridingConfigurer
+
+```
+10:38:50.148 [main] DEBUG org.springframework.core.env.StandardEnvironment - Adding PropertySource 'systemProperties' with lowest search precedence
+10:38:50.153 [main] DEBUG org.springframework.core.env.StandardEnvironment - Adding PropertySource 'systemEnvironment' with lowest search precedence
+10:38:50.153 [main] DEBUG org.springframework.core.env.StandardEnvironment - Initialized StandardEnvironment with PropertySources [MapPropertySource@1506809545 {name='systemProperties', properties={java.runtime.name=Java(TM) SE Runtime Environment, sun.boot.library.path...........
+10:38:50.262 [main] INFO org.springframework.beans.factory.xml.XmlBeanDefinitionReader - Loading XML bean definitions from class path resource [applicationContext_test.xml]
+10:38:50.287 [main] DEBUG org.springframework.beans.factory.xml.DefaultDocumentLoader - Using JAXP provider [com.sun.org.apache.xerces.internal.jaxp.DocumentBuilderFactoryImpl]
+10:38:50.334 [main] DEBUG org.springframework.beans.factory.xml.PluggableSchemaResolver - Loading schema mappings from [META-INF/spring.schemas]
+10:38:50.339 [main] DEBUG org.springframework.beans.factory.xml.PluggableSchemaResolver - Loaded schema mappings: {........}
+10:38:50.340 [main] DEBUG org.springframework.beans.factory.xml.PluggableSchemaResolver - Found XML schema [http://www.springframework.org/schema/beans/spring-beans.xsd] in classpath: org/springframework/beans/factory/xml/spring-beans.xsd
+10:38:50.387 [main] DEBUG org.springframework.beans.factory.xml.DefaultBeanDefinitionDocumentReader - Loading bean definitions
+10:38:50.402 [main] DEBUG org.springframework.beans.factory.xml.XmlBeanDefinitionReader - Loaded 3 bean definitions from location pattern [classpath:applicationContext_test.xml]
+10:38:50.402 [main] DEBUG org.springframework.context.support.ClassPathXmlApplicationContext - Bean factory for org.springframework.context.support.ClassPathXmlApplicationContext@60704c: org.springframework.beans.factory.support.DefaultListableBeanFactory@3e27ba32: defining beans [propertyConfigurer1,propertyConfigurer2,propertiesConfig]; root of factory hierarchy
+10:38:50.432 [main] DEBUG org.springframework.beans.factory.support.DefaultListableBeanFactory - Creating shared instance of singleton bean 'propertyConfigurer1'
+10:38:50.432 [main] DEBUG org.springframework.beans.factory.support.DefaultListableBeanFactory - Creating instance of bean 'propertyConfigurer1'
+10:38:50.451 [main] DEBUG org.springframework.beans.factory.support.DefaultListableBeanFactory - Eagerly caching bean 'propertyConfigurer1' to allow for resolving potential circular references
+10:38:50.496 [main] DEBUG org.springframework.beans.factory.support.DefaultListableBeanFactory - Finished creating instance of bean 'propertyConfigurer1'
+10:38:50.496 [main] DEBUG org.springframework.beans.factory.support.DefaultListableBeanFactory - Creating shared instance of singleton bean 'propertyConfigurer2'
+10:38:50.496 [main] DEBUG org.springframework.beans.factory.support.DefaultListableBeanFactory - Creating instance of bean 'propertyConfigurer2'
+10:38:50.500 [main] DEBUG org.springframework.beans.factory.support.DefaultListableBeanFactory - Eagerly caching bean 'propertyConfigurer2' to allow for resolving potential circular references
+10:38:50.505 [main] DEBUG org.springframework.beans.factory.support.DefaultListableBeanFactory - Finished creating instance of bean 'propertyConfigurer2'
+10:40:16.039 [main] DEBUG org.springframework.beans.factory.config.PropertyOverrideConfigurer - Loading properties file from class path resource [test.properties]
+10:41:34.407 [main] DEBUG org.springframework.beans.factory.config.PropertyOverrideConfigurer - Property 'propertiesConfig.testValue' set to value [overrideValue1]
+10:51:42.387 [main] DEBUG org.springframework.beans.factory.config.PropertyOverrideConfigurer - Property 'propertiesConfig.testValue2ForOverride' set to value [overrideValue2]
+```
